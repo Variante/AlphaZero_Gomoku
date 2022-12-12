@@ -146,7 +146,7 @@ class Game(object):
         for x in range(width):
             print("{0:8}".format(x), end='')
         print('\r\n')
-        for i in range(height - 1, -1, -1):
+        for i in range(height):
             print("{0:4d}".format(i), end='')
             for j in range(width):
                 loc = i * width + j
@@ -159,7 +159,7 @@ class Game(object):
                     print('_'.center(8), end='')
             print('\r\n\r\n')
 
-    def start_play(self, player1, player2, start_player=0, is_shown=1):
+    def start_play(self, player1, player2, env, start_player=0, is_shown=1):
         """start a game between two players"""
         if start_player not in (0, 1):
             raise Exception('start_player should be either 0 (player1 first) '
@@ -175,10 +175,20 @@ class Game(object):
             current_player = self.board.get_current_player()
             player_in_turn = players[current_player]
             move = player_in_turn.get_action(self.board)
+            if move == -1:
+                print('Reset the game')
+                return None
             self.board.do_move(move)
+            print('Current player, move:', current_player, move)
+            if current_player == 2:
+                env.drop_at(move)
             if is_shown:
                 self.graphic(self.board, player1.player, player2.player)
             end, winner = self.board.game_end()
+            if winner == 1:
+                env.flip()
+            elif winner == 2:
+                env.win()
             if end:
                 if is_shown:
                     if winner != -1:
