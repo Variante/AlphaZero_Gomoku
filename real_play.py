@@ -33,8 +33,15 @@ class Human(object):
         self.player = p
 
     def get_action(self, board):
+        allow_cheat = False
         while True:
-            key = input("Press enter when you are ready.")
+            cmds = [
+                'c: calibrate camera;',
+                'r: collect all start a new episode',
+                'f: flip',
+                'a: allow cheat',
+            ]
+            key = input("Press enter when you are ready.\n" + '\n'.join(cmds) + '\n')
             print('processing..')
             if key.startswith('c'):
                 self.env.calibrate()
@@ -45,9 +52,11 @@ class Human(object):
             elif key.startswith('r'):
                 print('Start over')
                 return -1
+            elif key.startswith('a'):
+                allow_cheat = True
             states = self.env.parse_board()
             diff = set(states[1]) - set(self.states[1])
-            if len(diff) != 1:
+            if len(diff) != 1 and not allow_cheat:
                 print(states)
                 print(self.states)
                 print(f'Found {len(diff)} stones {diff}, please check again.')
@@ -61,11 +70,13 @@ class Human(object):
 
 
 def run():
-    n = 4
-    width, height = 6, 6
-    model_file = f'best_policy_{width}_{height}_{n}.model2'
-
-    with RobotManager() as env:
+    n = 4 # num of checkers to win
+    width, height = 6, 6 # w and h of the checkerboard
+    model_file = f'best_policy_{width}_{height}_{n}.model'
+    human_first = True
+    n_playout = 400 # difficulties
+    
+    with RobotManager(b_width=width, b_height=height) as env:
         # env.calibrate()
         env.capture_img()
         env.load_calib()
@@ -84,7 +95,7 @@ def run():
         best_policy = PolicyValueNetNumpy(width, height, policy_param)
         mcts_player = MCTSPlayer(best_policy.policy_value_fn,
                                  c_puct=5,
-                                 n_playout=2000)  # set larger n_playout for better performance
+                                 n_playout=n_playout)  # set larger n_playout for better performance
 
         while True:
             try:
@@ -97,7 +108,7 @@ def run():
                 human = Human(env)
 
                 # set start_player=0 for human first
-                game.start_play(human, mcts_player, env, start_player=0, is_shown=1)
+                game.start_play(human, mcts_player, env, start_player=0 if human_first else 0, is_shown=1)
                 env.reset()
             except KeyboardInterrupt:
                 print('\n\rquit')

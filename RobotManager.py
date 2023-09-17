@@ -25,11 +25,11 @@ Grap height: z=25
 
 
 class RobotManager:
-    def __init__(self, obs_size=100):
+    def __init__(self, b_width, b_height, obs_size=100):
         self.swift = None
 
         x_limit = (130, 310)
-        y_limit = (-120, 120)
+        y_limit = (-100, 100)
         z_limit = (5, 80)
 
         self.limits = [x_limit, y_limit, z_limit]
@@ -40,13 +40,14 @@ class RobotManager:
         self.cam_top = None
         self.cam_thread = None
 
-        calib_num = 5
-        calib_c = 5
-        calib_h = 3
+        # array for calibration
+        calib_x_num = 5
+        calib_y_num = 5
+        calib_z_num = 3
         self.calib_3d = np.array(
-            [[[(i // calib_num) * (self.limits[0][1] - self.limits[0][0]) / (calib_c - 1) + self.limits[0][0],
-               (i % calib_num - calib_num // 2) * (self.limits[1][1] - self.limits[1][0]) / (calib_num - 1),
-               25 + j * 20] for j in range(calib_h)] for i in range(calib_num * calib_c)]
+            [[[(i // calib_x_num) * (self.limits[0][1] - self.limits[0][0]) / (calib_y_num - 1) + self.limits[0][0],
+               (i % calib_x_num - calib_x_num // 2) * (self.limits[1][1] - self.limits[1][0]) / (calib_x_num - 1),
+               25 + j * 20] for j in range(calib_z_num)] for i in range(calib_x_num * calib_y_num)]
         )
         self.calib_3d = self.calib_3d.reshape(-1, 3)
         self.calib_2d = np.array([[0, 0] for _ in range(self.calib_3d.shape[0])])
@@ -54,8 +55,8 @@ class RobotManager:
         self.calib_p = None
         self.frame_top = None
         self.corners = None
-        self.pickup_p = (114, -171)
-        self.pickup_c = 0
+        self.pickup_p = (115, -171) # location to pickup the checker
+        self.pickup_c = 0 # counter for num of checkers we picked it up
         """
         options = apriltag.Detectoroptions(families='tag36h11',
                                  border=1,
@@ -69,6 +70,9 @@ class RobotManager:
                                  quad_contours=True)
         """
         self.tagdetector = apriltag.Detector()
+        
+        self.b_width = b_width  # checkerboard size
+        self.b_height = b_height
 
     def get_pos(self):
         # res = self.swift.get_polar()
@@ -88,13 +92,13 @@ class RobotManager:
 
         swift.set_mode(0)
         self.swift = swift
-        self.cap_top = cv2.VideoCapture(0)
+        self.cap_top = cv2.VideoCapture(0) # for macos it may open your build-in camera, just stop and launch the code again
         if not self.cap_top.isOpened():
             raise IOError("Cannot open webcam")
-        self.is_running = True
+        # self.is_running = True
         # self.cam_thread = threading.Thread(target=self.cam_thread_func)
         # self.cam_thread.start()
-        # self.reset()
+        self.reset()
         return self
 
     def __exit__(self, *arg, **kwargs):
@@ -183,11 +187,16 @@ class RobotManager:
         return result
 
     def capture_img(self):
-        for _ in range(2):
-            ret, frame_top = self.cap_top.read()
+        while True:
+            for _ in range(3):
+                ret, frame_top = self.cap_top.read()
+            if ret:
+                break
+            print('Image read error, retry in 1s')
+            time.sleep(1)
         # print(frame_top.shape)
         self.frame_top = frame_top.copy()
-
+        
         def to_cv(t):
             return int(t[0]), int(t[1])
 
@@ -196,24 +205,8 @@ class RobotManager:
                 frame_top = cv2.circle(frame_top, to_cv(i), 3, (255, 0, 0), 2)
         for i in self.board_2d:
             frame_top = cv2.circle(frame_top, to_cv(i), 5, (0, 255, 0), 3)
-        """
-        if self.cube_pts is not None:
-            frame = cv2.circle(frame, to_cv(self.cube_pts), 3, (0, 0, 255), 2)
-        if self.dot_pts is not None:
-            frame = cv2.circle(frame, to_cv(self.dot_pts), 3, (0, 255, 0), 2)
-        for i in self.calib_2d:
-            if np.sum(i) > 0:
-                frame = cv2.circle(frame, to_cv(i[2:]), 2, (255, 0, 0), 1)
-        """
-        # print(frame_top.shape)
+            
         cv2.imshow('Input', frame_top)
-        # prepare observation
-        # h = frame.shape[0]
-        # w = frame.shape[1]
-        # c = (w - h) // 2
-
-        # cv2.imshow('Obs', np.concatenate([self.obs[:,:,:3], self.obs[:,:,3:]], axis=1))
-        # cv2.imshow('Obs2', self.obs[:, :, 3:])
         cv2.waitKey(10)
 
     def warp_board(self, tags):
@@ -225,6 +218,7 @@ class RobotManager:
             if i is None:
                 print("Can not detect 4 corners")
                 print(self.corners)
+                time.sleep(1)
                 if self.corners is None:
                     return None
                 else:
@@ -307,7 +301,8 @@ class RobotManager:
                     return 1
             return 0
 
-        w, h = 6, 6
+        w = self.b_width
+        h = self.b_height
         # availables = []
         states = {0: [], 1: [], 2:[]}
         wleft = 72
@@ -429,11 +424,16 @@ class RobotManager:
         self.swift.reset()
 
     def cam_thread_func(self):
-        cv2.namedWindow('Input', cv2.WINDOW_NORMAL)
+        # do not play with UI in the spawn thread!
         while self.is_running:
-            ret, frame_top = self.cap_top.read()
+            while True: 
+                ret, frame_top = self.cap_top.read()
+                if ret:
+                    break
+                time.sleep(0.1)
             # print(frame_top.shape)
             self.frame_top = frame_top.copy()
+            continue
 
             def to_cv(t):
                 return int(t[0]), int(t[1])
@@ -454,8 +454,8 @@ class RobotManager:
                 if np.sum(i) > 0:
                     frame = cv2.circle(frame, to_cv(i[2:]), 2, (255, 0, 0), 1)
             """
-            print(frame_top.shape)
-            cv2.imshow('Input', frame_top)
+            # print(frame_top.shape)
+            # cv2.imshow('Input', frame_top)
             # prepare observation
             # h = frame.shape[0]
             # w = frame.shape[1]
@@ -463,8 +463,8 @@ class RobotManager:
 
             # cv2.imshow('Obs', np.concatenate([self.obs[:,:,:3], self.obs[:,:,3:]], axis=1))
             # cv2.imshow('Obs2', self.obs[:, :, 3:])
-            cv2.waitKey(10)
-        cv2.destroyAllWindows()
+            # cv2.waitKey(10)
+        # cv2.destroyAllWindows()
 
     def pickup(self):
         self.swift.set_position(x=int(self.pickup_p[0]), y=int(self.pickup_p[1]), z=max(0, 32 - self.pickup_c),
@@ -518,8 +518,8 @@ class RobotManager:
 if __name__ == '__main__':
     with RobotManager() as env:
         # env.calibrate()
-        env.capture_img()
-        env.load_calib()
+        # env.capture_img()
+        # env.load_calib()
         for i in range(18):
             env.parse_board()
             env.drop_at(i)

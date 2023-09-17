@@ -1,3 +1,32 @@
+## uArm + AlphaZero-Gomoku
+
+Attach an uArm to put the checkers to the checkerboard. A quick video demo at [Bilibili](https://www.bilibili.com/video/BV1uD4y1a7Ws/).
+
+Debug:
+1. Change camera id: `L91` in `RobotManager.py`
+2. Change checker color: `L304-309` in `RobotManager.py`
+3. Change checkerboard size / rules: `run()` in`real_play.py`
+
+Cmds:
+1. c: calibrate the camera
+2. r: restart an episode (TODO: automatically collect checkers)
+3. f: flip the checkerboard
+4. a: allow cheating when detects errors
+
+First time use:
+1. Print the checkerboard at this repo(./checkerboard/6x6board.pdf)
+2. Print an AprilTag [num 0 in tag36h11](https://github.com/AprilRobotics/apriltag-imgs/blob/master/tag36h11/tag36_11_00000.png) and put it on top of the gripper
+3. Set up the camera so it can see the checkerboard and the moving robot gripper
+4. Run calibration (press c in command line)
+
+For every episode:
+1. User put the checker and press any key (except c, r, f) to continue 
+2. The robot starts a move
+3. If you wins the robot will flip the checkerboard by default
+
+---
+Here comes the original readme
+---
 ## AlphaZero-Gomoku
 This is an implementation of the AlphaZero algorithm for playing the simple board game Gomoku (also called Gobang or Five in a Row) from pure self-play training. The game Gomoku is much simpler than Go or chess, so that we can focus on the training scheme of AlphaZero and obtain a pretty good AI model on a single PC in a few hours. 
 
