@@ -305,7 +305,7 @@ class RobotManager:
         h = self.b_height
         # availables = []
         states = {0: [], 1: [], 2:[]}
-        wleft = 72
+        wleft = 60
         ww = 53
         htop = 12
         hh = 55
